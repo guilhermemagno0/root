@@ -1,0 +1,102 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+typedef struct {
+    int size;
+    int *a;
+    int *b;
+    int *c;
+} vectorssum_t;
+
+
+vectorssum_t vectorsum;
+
+
+void init_vectors(int size) {
+    vectorsum.size = size;
+    vectorsum.a = (int*)malloc(size * sizeof(int));
+    vectorsum.b = (int*)malloc(size * sizeof(int));
+    vectorsum.c = (int*)malloc(size * sizeof(int));
+
+    for (int i = 0; i < size; i++) {
+        vectorsum.a[i] = i;
+        vectorsum.b[i] = 2 * i;
+    }
+}
+
+
+void serial_sum_vectors() {
+    for (int i = 0; i < vectorsum.size; i++) {
+        vectorsum.c[i] = vectorsum.a[i] + vectorsum.b[i];
+    }
+}
+
+
+typedef struct {
+    int thread_id;
+    int num_threads;
+} thread_data_t;
+
+void* parallel_sum_portion(void* arg) {
+    thread_data_t* data = (thread_data_t*)arg;
+    int chunk_size = vectorsum.size / data->num_threads;
+    int start = data->thread_id * chunk_size;
+    int end = (data->thread_id == data->num_threads - 1) ? vectorsum.size : start + chunk_size;
+
+    for (int i = start; i < end; i++) {
+        vectorsum.c[i] = vectorsum.a[i] + vectorsum.b[i];
+    }
+    pthread_exit(NULL);
+}
+
+void parallel_sum_vectors(int num_threads) {
+    pthread_t threads[num_threads];
+    thread_data_t thread_data[num_threads];
+
+    for (int i = 0; i < num_threads; i++) {
+        thread_data[i].thread_id = i;
+        thread_data[i].num_threads = num_threads;
+        pthread_create(&threads[i], NULL, parallel_sum_portion, (void*)&thread_data[i]);
+    }
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(threads[i], NULL);
+    }
+}
+
+
+int main() {
+    int size = 10; 
+    init_vectors(size);
+
+
+    serial_sum_vectors();
+    printf("Resultado Serial:\n");
+    for (int i = 0; i < size; i++) {
+        printf("c[%d] = %d\n", i, vectorsum.c[i]);
+    }
+
+
+    for (int i = 0; i < size; i++) {
+        vectorsum.c[i] = 0;
+    }
+
+    
+    parallel_sum_vectors(2); 
+    printf("\nResultado Paralelo:\n");
+    for (int i = 0; i < size; i++) {
+        printf("c[%d] = %d\n", i, vectorsum.c[i]);
+    }
+
+
+    free(vectorsum.a);
+    free(vectorsum.b);
+    free(vectorsum.c);
+
+    return 0;
+}
+
+
+
+
